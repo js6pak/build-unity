@@ -11,6 +11,8 @@ inputs:
   build-target:
     description: Build target
     required: true
+  build-scripting-backend:
+    description: Scripting backend
   build-path:
     description: Path to build output. Only for default build method
     required: false

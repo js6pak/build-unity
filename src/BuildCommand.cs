@@ -23,6 +23,11 @@ namespace kuler90
             var buildOptions = HandleBuildOptions(args);
             var scenes = HandleScenesList(args);
 
+            if (args.ContainsKey("scriptingBackend"))
+            {
+                PlayerSettings.SetScriptingBackend(BuildTargetGroup.Standalone, (ScriptingImplementation)Enum.Parse(typeof(ScriptingImplementation), args["scriptingBackend"], true));
+            }
+
             var buildReport = BuildPipeline.BuildPlayer(scenes, buildPath, target, buildOptions);
             int code = (buildReport.summary.result == BuildResult.Succeeded) ? 0 : 1;
 
