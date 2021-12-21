@@ -14,13 +14,10 @@ namespace kuler90
 
         public static void Build()
         {
-            ParseCommandLineArguments(out var args);
+            var args = ParseCommandLineArguments();
 
-            HandleVersion(args);
-            HandleDefines(args);
             var target = HandleTarget(args);
             var buildPath = HandleBuildPath(args);
-            var buildOptions = HandleBuildOptions(args);
             var scenes = HandleScenesList(args);
 
             if (args.ContainsKey("scriptingBackend"))
@@ -28,45 +25,21 @@ namespace kuler90
                 PlayerSettings.SetScriptingBackend(BuildTargetGroup.Standalone, (ScriptingImplementation)Enum.Parse(typeof(ScriptingImplementation), args["scriptingBackend"], true));
             }
 
-            var buildReport = BuildPipeline.BuildPlayer(scenes, buildPath, target, buildOptions);
+            var buildReport = BuildPipeline.BuildPlayer(scenes, buildPath, target, BuildOptions.None);
             int code = (buildReport.summary.result == BuildResult.Succeeded) ? 0 : 1;
 
-            ResetDefines();
             EditorApplication.Exit(code);
         }
 
         private static BuildTarget HandleTarget(Dictionary<string, string> args)
         {
             var target = (BuildTarget)Enum.Parse(typeof(BuildTarget), args["buildTarget"], true);
-            if (target == BuildTarget.Android)
-            {
-                if (args.ContainsKey("androidKeystoreName"))
-                {
-#if UNITY_2019_1_OR_NEWER
-                    PlayerSettings.Android.useCustomKeystore = true;
-#endif
-                    PlayerSettings.Android.keystoreName = args["androidKeystoreName"];
-                }
-                if (args.ContainsKey("androidKeystorePass"))
-                {
-                    PlayerSettings.Android.keystorePass = args["androidKeystorePass"];
-                }
-                if (args.ContainsKey("androidKeyaliasName"))
-                {
-                    PlayerSettings.Android.keyaliasName = args["androidKeyaliasName"];
-                }
-                if (args.ContainsKey("androidKeyaliasPass"))
-                {
-                    PlayerSettings.Android.keyaliasPass = args["androidKeyaliasPass"];
-                }
-            }
             return target;
         }
 
         private static string HandleBuildPath(Dictionary<string, string> args)
         {
             var buildPath = args["buildPath"];
-            EditorUserBuildSettings.buildAppBundle = buildPath.EndsWith(".aab");
             return buildPath;
         }
 
@@ -75,57 +48,9 @@ namespace kuler90
             return EditorBuildSettings.scenes.Where(scene => scene.enabled).Select(s => s.path).ToArray();
         }
 
-        private static BuildOptions HandleBuildOptions(Dictionary<string, string> args)
+        private static Dictionary<string, string> ParseCommandLineArguments()
         {
-            var buildOptions = BuildOptions.None;
-            if (args.ContainsKey("buildOptions"))
-            {
-                buildOptions = args["buildOptions"]
-                    .Split(',')
-                    .Select(stringValue => Enum.TryParse<BuildOptions>(stringValue.Trim(), true, out var enumValue) ? enumValue : BuildOptions.None)
-                    .Aggregate((f1, f2) => f1 | f2);
-            }
-            return buildOptions;
-        }
-
-        private static void HandleVersion(Dictionary<string, string> args)
-        {
-            if (args.ContainsKey("buildVersion"))
-            {
-                PlayerSettings.bundleVersion = args["buildVersion"];
-            }
-            if (args.ContainsKey("buildNumber"))
-            {
-                int buildNumber = int.Parse(args["buildNumber"]);
-                PlayerSettings.Android.bundleVersionCode = buildNumber;
-                PlayerSettings.iOS.buildNumber = buildNumber.ToString();
-                PlayerSettings.macOS.buildNumber = buildNumber.ToString();
-                PlayerSettings.tvOS.buildNumber = buildNumber.ToString();
-            }
-        }
-
-        private static void HandleDefines(Dictionary<string, string> args)
-        {
-            if (args.ContainsKey("buildDefines"))
-            {
-                originalDefines = PlayerSettings.GetScriptingDefineSymbolsForGroup(EditorUserBuildSettings.selectedBuildTargetGroup);
-                string newDefines = originalDefines + ";" + args["buildDefines"];
-                PlayerSettings.SetScriptingDefineSymbolsForGroup(EditorUserBuildSettings.selectedBuildTargetGroup, newDefines);
-            }
-        }
-
-        private static void ResetDefines()
-        {
-            if (originalDefines != null)
-            {
-                PlayerSettings.SetScriptingDefineSymbolsForGroup(EditorUserBuildSettings.selectedBuildTargetGroup, originalDefines);
-                originalDefines = null;
-            }
-        }
-
-        private static void ParseCommandLineArguments(out Dictionary<string, string> result)
-        {
-            result = new Dictionary<string, string>();
+            Dictionary<string, string> result = new Dictionary<string, string>();
             string[] args = Environment.GetCommandLineArgs();
 
             // Extract flags with optional values
@@ -143,22 +68,8 @@ namespace kuler90
 
                 result.Add(flag, value);
             }
-        }
 
-        [PostProcessBuild(45)]
-        // https://github.com/googlesamples/unity-jar-resolver/issues/328
-        static void OnPostProcessPodfile(BuildTarget target, string path)
-        {
-            if (target == BuildTarget.iOS)
-            {
-                string podfilePath = Path.Combine(path, "podfile");
-                if (File.Exists(podfilePath))
-                {
-                    string text = File.ReadAllText(podfilePath);
-                    text = text.Replace("https://github.com/CocoaPods/Specs.git", "https://cdn.cocoapods.org");
-                    File.WriteAllText(podfilePath, text);
-                }
-            }
+            return result;
         }
     }
 }
